@@ -6,7 +6,7 @@
 ## Возможности
 - Управление реле / диммерами по Wi-Fi
 - RGB-лента с эффектами (fade, rainbow, etc.)
-- Голосовое управление (интеграция с Siri/Iphone shortcuts)
+- Голосовое управление (интеграция с Siri/Iphone shortcuts/HTTP-API)
 
 ## Аппаратная часть
 - ESP32-C3 SuperMini
