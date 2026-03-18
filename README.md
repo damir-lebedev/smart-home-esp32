@@ -22,7 +22,7 @@
 - PlatformIO + ESP-IDF / Arduino framework
 - FastLED / NeoPixel для RGB
 - PubSubClient / AsyncMQTT для MQTT
-- ESPAsyncWebServer + WebSocket для ![веб-интерфейса](docs/InerfaceALLbtns.jpg)
+- ESPAsyncWebServer + WebSocket для веб-интерфейса
 
 ## Как запустить
 1. Установить PlatformIO в VS Code
@@ -30,8 +30,10 @@
 3. ESP Раздаёт точку доступа "SmartModule_Setup", подключаемся с любого устройства
 4. Переходим с того же устройства по http://192.168.4.1
 5. Вводим данные (SSID - Название домашнего Wi-Fi, Пароль - пароль, Master/Slave - об этом ниже)
-6. Смотрим на странице роутера ip подключившегося модуля, переходим по ![http://ваш*ip](docs/InerfaceALLbtns.jpg)
+6. Смотрим на странице роутера ip подключившегося модуля, переходим по http://ваш*ip
 7. Готово! Пользуемся умным домом!
+
+![](docs/InterfaceALLbtns.jpg)
 
 ## Статус проекта
 Рабочий прототип. В процессе рефакторинга и перехода на чистый C++ без Arduino-библиотек.
