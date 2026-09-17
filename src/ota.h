@@ -1,6 +1,6 @@
 #pragma once
 
-// Mounts LittleFS (master only) and registers all OTA routes:
+// Registers all OTA routes:
 //  - /update              ElegantOTA portal, on every module (flash one device by hand)
 //  - /fleet/pull          on every module, master uses it to trigger a self-update
 //  - /fleet/upload        master only, receives the .bin to distribute

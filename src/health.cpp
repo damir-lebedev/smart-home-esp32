@@ -1,6 +1,7 @@
 #include "health.h"
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_idf_version.h>
 #include <esp_task_wdt.h>
 
 static const uint32_t WDT_TIMEOUT_S = 20;
@@ -11,7 +12,16 @@ static const unsigned long WIFI_RECONNECT_AFTER_MS = 10000;
 static const unsigned long WIFI_RESTART_AFTER_MS = 120000;
 
 void healthInitWatchdog() {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+  esp_task_wdt_config_t config = {
+      .timeout_ms = WDT_TIMEOUT_S * 1000,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  esp_task_wdt_init(&config);
+#else
   esp_task_wdt_init(WDT_TIMEOUT_S, true);
+#endif
   esp_task_wdt_add(NULL);
 }
 

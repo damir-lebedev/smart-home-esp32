@@ -2,10 +2,12 @@
 #include "globals.h"
 #include "health.h"
 
-#include <LittleFS.h>
+#include <esp_ota_ops.h>
+#include <esp_partition.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <ArduinoJson.h>
+#include <algorithm>
 #include <vector>
 
 #define ELEGANTOTA_USE_ASYNC_WEBSERVER 1
@@ -49,13 +51,20 @@ static void applyPendingSelfUpdate() {
 }
 
 // ── Master: stores the uploaded firmware and serves it to the network ──
+//
+// The uploaded image is written straight into the module's own inactive OTA
+// slot (via esp_ota_*) and served to the fleet by reading that same flash
+// region back out. This avoids keeping a third full copy of the firmware
+// around on a filesystem, which a 4MB flash chip has no room for once the
+// two OTA app partitions are each sized to fit the firmware.
 
-static const char* FIRMWARE_PATH = "/firmware.bin";
-static File otaUploadFile;
+static const esp_partition_t* fwStorePartition = nullptr;
+static size_t fwStoredSize = 0;
+static esp_ota_handle_t otaUploadHandle = 0;
+static bool otaUploadHandleOpen = false;
 static bool otaUploadUnauthorized = false;
 static bool otaUploadOpenFailed = false;
 static size_t otaUploadBytesWritten = 0;
-static bool fsMounted = false;
 
 static void registerFirmwareUploadRoute() {
   server.on(
@@ -67,10 +76,7 @@ static void registerFirmwareUploadRoute() {
         return;
       }
       if (otaUploadOpenFailed) {
-        r->send(
-          500, "text/plain; charset=utf-8",
-          String("Could not open /firmware.bin for writing (LittleFS mounted: ") + (fsMounted ? "yes" : "no") + ")"
-        );
+        r->send(500, "text/plain; charset=utf-8", "Could not start writing firmware to the store partition");
         return;
       }
       r->send(200, "text/plain; charset=utf-8", "Uploaded: " + String((unsigned)otaUploadBytesWritten) + " bytes");
@@ -85,19 +91,29 @@ static void registerFirmwareUploadRoute() {
         }
         otaUploadUnauthorized = false;
         Serial.println("[OTA] Receiving firmware: " + filename);
-        if (LittleFS.exists(FIRMWARE_PATH)) LittleFS.remove(FIRMWARE_PATH);
-        otaUploadFile = LittleFS.open(FIRMWARE_PATH, "w");
-        if (!otaUploadFile) {
+        fwStorePartition = esp_ota_get_next_update_partition(NULL);
+        if (!fwStorePartition || esp_ota_begin(fwStorePartition, OTA_SIZE_UNKNOWN, &otaUploadHandle) != ESP_OK) {
           otaUploadOpenFailed = true;
-          Serial.println("[OTA] Failed to open /firmware.bin for writing");
+          otaUploadHandleOpen = false;
+          Serial.println("[OTA] Failed to begin writing to the store partition");
+        } else {
+          otaUploadHandleOpen = true;
         }
       }
       if (otaUploadUnauthorized || otaUploadOpenFailed) return;
-      if (otaUploadFile) {
-        otaUploadBytesWritten += otaUploadFile.write(data, len);
+      if (otaUploadHandleOpen) {
+        if (esp_ota_write(otaUploadHandle, data, len) == ESP_OK) {
+          otaUploadBytesWritten += len;
+        } else {
+          Serial.println("[OTA] Write to store partition failed");
+        }
       }
       if (final) {
-        if (otaUploadFile) otaUploadFile.close();
+        if (otaUploadHandleOpen) {
+          esp_ota_end(otaUploadHandle);
+          otaUploadHandleOpen = false;
+          fwStoredSize = otaUploadBytesWritten;
+        }
         Serial.printf("[OTA] Firmware stored: %u bytes\n", (unsigned)otaUploadBytesWritten);
       }
     }
@@ -111,16 +127,9 @@ static void registerFirmwareDebugRoute() {
       return;
     }
     String out;
-    out += "mounted=" + String(fsMounted ? "yes" : "no") + "\n";
-    out += "total=" + String((unsigned)LittleFS.totalBytes()) + "\n";
-    out += "used=" + String((unsigned)LittleFS.usedBytes()) + "\n";
-    out += "exists(/firmware.bin)=" + String(LittleFS.exists(FIRMWARE_PATH) ? "yes" : "no") + "\n";
-    File root = LittleFS.open("/");
-    File f = root.openNextFile();
-    while (f) {
-      out += String("entry: ") + f.path() + " (" + (unsigned)f.size() + " bytes)\n";
-      f = root.openNextFile();
-    }
+    out += "store_partition=" + String(fwStorePartition ? fwStorePartition->label : "none") + "\n";
+    out += "store_partition_size=" + String((unsigned)(fwStorePartition ? fwStorePartition->size : 0)) + "\n";
+    out += "stored_bytes=" + String((unsigned)fwStoredSize) + "\n";
     r->send(200, "text/plain; charset=utf-8", out);
   });
 }
@@ -131,11 +140,20 @@ static void registerFirmwareServeRoute() {
       r->send(401, "text/plain; charset=utf-8", "Unauthorized");
       return;
     }
-    if (!LittleFS.exists(FIRMWARE_PATH)) {
+    if (!fwStorePartition || fwStoredSize == 0) {
       r->send(404, "text/plain; charset=utf-8", "No firmware uploaded yet");
       return;
     }
-    r->send(LittleFS, FIRMWARE_PATH, "application/octet-stream");
+    AsyncWebServerResponse* response = r->beginResponse(
+      "application/octet-stream", fwStoredSize,
+      [](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
+        if (!fwStorePartition || index >= fwStoredSize) return 0;
+        size_t toRead = std::min(maxLen, fwStoredSize - index);
+        if (esp_partition_read(fwStorePartition, index, buffer, toRead) != ESP_OK) return 0;
+        return toRead;
+      }
+    );
+    r->send(response);
   });
 }
 
@@ -282,7 +300,7 @@ static void registerDeployRoutes() {
       r->send(401, "text/plain; charset=utf-8", "Unauthorized");
       return;
     }
-    if (!LittleFS.exists(FIRMWARE_PATH)) {
+    if (!fwStorePartition || fwStoredSize == 0) {
       r->send(400, "text/plain; charset=utf-8", "No firmware uploaded");
       return;
     }
@@ -334,10 +352,6 @@ void otaBegin() {
   });
 
   if (role == "master") {
-    fsMounted = LittleFS.begin(true);
-    if (!fsMounted) {
-      Serial.println("[OTA] LittleFS mount failed");
-    }
     registerFirmwareUploadRoute();
     registerFirmwareServeRoute();
     registerFirmwareDebugRoute();
