@@ -6,7 +6,10 @@
 // reboots on its own instead of needing someone to pull the plug.
 void healthInitWatchdog();
 
-// Call once per loop() iteration, unconditionally.
+// Call once per loop() iteration, unconditionally. Also call anywhere in
+// setup() that can legitimately block for a while (WiFi connect wait,
+// first-time LittleFS format, ...) - the watchdog isn't fed automatically
+// until loop() starts, so a slow setup() would otherwise trip it.
 void healthFeedWatchdog();
 
 // Self-OTA legitimately blocks for tens of seconds downloading + flashing.

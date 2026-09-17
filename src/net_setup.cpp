@@ -1,6 +1,7 @@
 #include "net_setup.h"
 #include "globals.h"
 #include "ws_events.h"
+#include "health.h"
 
 static String renderConfigPage() {
   String checkedSlave = role == "master" ? "" : "checked";
@@ -157,6 +158,7 @@ bool netConnectSTA(const String& ssid, const String& pass) {
   uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 14000) {
     delay(400);
+    healthFeedWatchdog();  // this runs before loop() starts feeding it
   }
   return WiFi.status() == WL_CONNECTED;
 }

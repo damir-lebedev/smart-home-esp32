@@ -12,7 +12,7 @@
 // /status on every module, so you can always tell which firmware a device is
 // actually running (and the network-wide OTA rollout uses it to confirm a
 // device has actually rebooted into the new build).
-#define FIRMWARE_VERSION "2026.09.17-10"
+#define FIRMWARE_VERSION "2026.09.17-11"
 
 extern AsyncWebServer server;
 extern AsyncWebSocket ws;

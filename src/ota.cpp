@@ -106,6 +106,10 @@ static void registerFirmwareUploadRoute() {
 
 static void registerFirmwareDebugRoute() {
   server.on("/fleet/debug", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!adminKeyOk(r)) {
+      r->send(401, "text/plain", "Unauthorized");
+      return;
+    }
     String out;
     out += "mounted=" + String(fsMounted ? "yes" : "no") + "\n";
     out += "total=" + String((unsigned)LittleFS.totalBytes()) + "\n";
