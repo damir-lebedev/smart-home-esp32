@@ -3,7 +3,7 @@
 #include "discovery.h"
 #include <ArduinoJson.h>
 
-static String getUiFragment() {
+static String getRelayUiFragment() {
   return R"rawliteral(
 <div class="module-card">
   <h3>{{name}}</h3>
@@ -13,6 +13,38 @@ static String getUiFragment() {
     <button class="btn on"    onclick="cmd('{{ip}}','on')">ВКЛ</button>
     <button class="btn off"   onclick="cmd('{{ip}}','off')">ВЫКЛ</button>
     <button class="btn toggle" onclick="cmd('{{ip}}','toggle')">ПЕРЕКЛ</button>
+  </div>
+</div>
+)rawliteral";
+}
+
+static String getRgbUiFragment() {
+  return R"rawliteral(
+<div class="module-card">
+  <h3>🌈 {{name}}</h3>
+  <div class="status" id="status_{{safeid}}">Загрузка...</div>
+  <div class="indicator" id="indicator_{{safeid}}">⚪</div>
+  <div class="buttons">
+    <button class="btn on"  onclick="cmd('{{ip}}','on')">ВКЛ</button>
+    <button class="btn off" onclick="cmd('{{ip}}','off')">ВЫКЛ</button>
+  </div>
+  <div style="margin-top:10px">
+    <select onchange="fetch('http://{{ip}}/mode?set='+this.value)">
+      <option value="1">🎨 Статичный</option>
+      <option value="2">🌈 Радуга</option>
+      <option value="3">🌈 Цикл</option>
+      <option value="4">🌬️ Дыхание</option>
+      <option value="5">🏃 Chase</option>
+    </select>
+  </div>
+  <div style="margin-top:10px">
+    <input type="color" onchange="fetch('http://{{ip}}/color?hex='+this.value.replace('#',''))">
+  </div>
+  <div style="margin-top:10px">
+    <input type="range" min="5" max="255" oninput="fetch('http://{{ip}}/brightness?val='+this.value)">
+  </div>
+  <div style="margin-top:10px">
+    <input type="range" min="0" max="255" oninput="fetch('http://{{ip}}/speed?val='+this.value)">
   </div>
 </div>
 )rawliteral";
@@ -28,7 +60,15 @@ void webUiRegisterCommonRoutes() {
     doc["fw"] = FIRMWARE_VERSION;
 
     JsonObject state = doc["state"].to<JsonObject>();
-    state["power"] = relayState;
+    if (moduleType == "rgb") {
+      state["power"] = rgbPower;
+      state["mode"] = rgbMode;
+      state["brightness"] = rgbBrightness;
+      state["color"] = rgbColorHex;
+      state["speed"] = rgbSpeed;
+    } else {
+      state["power"] = relayState;
+    }
 
     String buf;
     serializeJson(doc, buf);
@@ -39,7 +79,7 @@ void webUiRegisterCommonRoutes() {
   });
 
   server.on("/ui", HTTP_GET, [](AsyncWebServerRequest* r) {
-    String fragment = getUiFragment();
+    String fragment = moduleType == "rgb" ? getRgbUiFragment() : getRelayUiFragment();
     String ipStr = WiFi.localIP().toString();
     String safeId = ipStr;
     safeId.replace(".", "_");
@@ -358,6 +398,47 @@ pollDeployStatus();
 
 void webUiRegisterSlaveRoute() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* r) {
+    String moduleHtml = moduleType == "rgb" ? R"rawliteral(
+<div class="module-card">
+  <h3>🌈 {{name}}</h3>
+  <div class="status" id="status">Загрузка...</div>
+  <div class="indicator" id="indicator">⚪</div>
+  <div class="buttons">
+    <button class="btn on" onclick="cmd('on')">ВКЛ</button>
+    <button class="btn off" onclick="cmd('off')">ВЫКЛ</button>
+  </div>
+  <div style="margin-top:10px">
+    <select onchange="fetch('/mode?set='+this.value)">
+      <option value="1">🎨 Статичный</option>
+      <option value="2">🌈 Радуга</option>
+      <option value="3">🌈 Цикл</option>
+      <option value="4">🌬️ Дыхание</option>
+      <option value="5">🏃 Chase</option>
+    </select>
+  </div>
+  <div style="margin-top:10px">
+    <input type="color" onchange="fetch('/color?hex='+this.value.replace('#',''))">
+  </div>
+  <div style="margin-top:10px">
+    <input type="range" min="5" max="255" oninput="fetch('/brightness?val='+this.value)">
+  </div>
+  <div style="margin-top:10px">
+    <input type="range" min="0" max="255" oninput="fetch('/speed?val='+this.value)">
+  </div>
+</div>
+)rawliteral" : R"rawliteral(
+<div class="module-card">
+  <h3>{{name}}</h3>
+  <div class="status" id="status">Загрузка...</div>
+  <div class="indicator" id="indicator">⚪</div>
+  <div class="buttons">
+    <button class="btn on" onclick="cmd('on')">ВКЛ</button>
+    <button class="btn off" onclick="cmd('off')">ВЫКЛ</button>
+    <button class="btn toggle" onclick="cmd('toggle')">ПЕРЕКЛ</button>
+  </div>
+</div>
+)rawliteral";
+
     String html = R"rawliteral(
 <!DOCTYPE html>
 <html lang="ru">
@@ -384,16 +465,7 @@ void webUiRegisterSlaveRoute() {
 </style>
 </head>
 <body>
-<div class="module-card">
-  <h3>{{name}}</h3>
-  <div class="status" id="status">Загрузка...</div>
-  <div class="indicator" id="indicator">⚪</div>
-  <div class="buttons">
-    <button class="btn on" onclick="cmd('on')">ВКЛ</button>
-    <button class="btn off" onclick="cmd('off')">ВЫКЛ</button>
-    <button class="btn toggle" onclick="cmd('toggle')">ПЕРЕКЛ</button>
-  </div>
-</div>
+{{module}}
 <div class="master-link" id="masterLink"></div>
 <div class="footer-link"><a href="/config">Настройки модуля</a></div>
 
@@ -432,6 +504,7 @@ setInterval(loadMaster, 10000);
 </body>
 </html>
 )rawliteral";
+    html.replace("{{module}}", moduleHtml);
     html.replace("{{name}}", deviceName);
     r->send(200, "text/html; charset=utf-8", html);
   });

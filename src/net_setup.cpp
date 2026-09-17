@@ -6,6 +6,9 @@
 static String renderConfigPage() {
   String checkedSlave = role == "master" ? "" : "checked";
   String checkedMaster = role == "master" ? "checked" : "";
+  String currentType = prefs.getString("type", "relay");
+  String checkedRelay = currentType == "rgb" ? "" : "checked";
+  String checkedRgb = currentType == "rgb" ? "checked" : "";
 
   String page = R"rawliteral(
 <!DOCTYPE html>
@@ -44,7 +47,12 @@ static String renderConfigPage() {
   </div>
 
   <div class="radio-group">
-    <label><input type="checkbox" name="invert" value="1" {{checkedInvert}}> Реле инвертировано (другая ревизия платы — включается высоким уровнем, а не низким)</label>
+    <label><input type="radio" name="type" value="relay" {{checkedRelay}}> Реле (свет/розетка вкл-выкл)</label><br>
+    <label><input type="radio" name="type" value="rgb" {{checkedRgb}}> RGB-подсветка (лента WS2812)</label>
+  </div>
+
+  <div class="radio-group">
+    <label><input type="checkbox" name="invert" value="1" {{checkedInvert}}> Реле инвертировано (другая ревизия платы — включается высоким уровнем, а не низким; не относится к RGB-модулю)</label>
   </div>
 
   <label>Ключ OTA (общий для всей сети, необязательно)</label>
@@ -63,6 +71,8 @@ static String renderConfigPage() {
   page.replace("{{name}}", deviceName);
   page.replace("{{checkedSlave}}", checkedSlave);
   page.replace("{{checkedMaster}}", checkedMaster);
+  page.replace("{{checkedRelay}}", checkedRelay);
+  page.replace("{{checkedRgb}}", checkedRgb);
   page.replace("{{checkedInvert}}", prefs.getBool("invert", false) ? "checked" : "");
   page.replace("{{keyfield}}", "");
   return page;
@@ -93,11 +103,12 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
     return;
   }
 
-  String ssid, pass, name, roleVal, otakey;
+  String ssid, pass, name, roleVal, typeVal, otakey;
   if (r->hasParam("ssid", true)) ssid = r->getParam("ssid", true)->value();
   if (r->hasParam("pass", true)) pass = r->getParam("pass", true)->value();
   if (r->hasParam("name", true)) name = r->getParam("name", true)->value();
   if (r->hasParam("role", true)) roleVal = r->getParam("role", true)->value();
+  if (r->hasParam("type", true)) typeVal = r->getParam("type", true)->value();
   if (r->hasParam("otakey", true)) otakey = r->getParam("otakey", true)->value();
   bool invert = r->hasParam("invert", true);
 
@@ -115,6 +126,7 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
   prefs.putString("pass", pass);
   prefs.putString("name", name.length() > 0 ? name : "Module");
   prefs.putString("role", roleVal == "master" ? "master" : "slave");
+  prefs.putString("type", typeVal == "rgb" ? "rgb" : "relay");
   prefs.putString("otakey", otakey);
   prefs.putBool("invert", invert);
 

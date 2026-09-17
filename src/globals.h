@@ -12,7 +12,7 @@
 // /status on every module, so you can always tell which firmware a device is
 // actually running (and the network-wide OTA rollout uses it to confirm a
 // device has actually rebooted into the new build).
-#define FIRMWARE_VERSION "2026.09.17-12"
+#define FIRMWARE_VERSION "2026.09.17-13"
 
 extern AsyncWebServer server;
 extern AsyncWebSocket ws;
@@ -24,9 +24,15 @@ extern IPAddress broadcastIP;
 extern const int RELAY_PIN;
 extern bool relayState;
 
+extern bool rgbPower;
+extern uint8_t rgbMode;
+extern uint8_t rgbBrightness;
+extern uint8_t rgbSpeed;
+extern uint32_t rgbColorHex;
+
 extern String deviceName;
 extern String role;          // "slave" or "master"
-extern String moduleType;    // "relay" for now
+extern String moduleType;    // "relay" or "rgb", persisted via /config
 
 struct ModuleInfo {
   String name;

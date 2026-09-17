@@ -32,7 +32,7 @@ void relaySet(bool on) {
   relayState = on;
   digitalWrite(RELAY_PIN, relayState ? activeLevel() : idleLevel());
   prefs.putBool("relay", relayState);
-  broadcastRelayState(WiFi.localIP().toString(), relayState);
+  broadcastPowerState(WiFi.localIP().toString(), relayState);
 }
 
 void relayRegisterRoutes() {

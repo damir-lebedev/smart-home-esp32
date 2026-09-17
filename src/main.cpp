@@ -1,5 +1,6 @@
 #include "globals.h"
 #include "relay.h"
+#include "rgb.h"
 #include "net_setup.h"
 #include "discovery.h"
 #include "ws_events.h"
@@ -11,15 +12,25 @@ void setup() {
   healthInitWatchdog();
 
   prefs.begin("smartmod", false);
-  relayLoadConfig();
-  relayForceOff();
+  moduleType = prefs.getString("type", "relay");
+
+  if (moduleType == "rgb") {
+    rgbInit();
+    rgbLoadConfig();
+  } else {
+    relayLoadConfig();
+    relayForceOff();
+  }
 
   String savedSsid = prefs.getString("ssid", "");
   String savedPass = prefs.getString("pass", "");
   deviceName = prefs.getString("name", "Module");
   role = prefs.getString("role", "slave");
-  relayState = prefs.getBool("relay", false);
-  relayApplyState();
+
+  if (moduleType != "rgb") {
+    relayState = prefs.getBool("relay", false);
+    relayApplyState();
+  }
 
   if (savedSsid == "") {
     netStartApMode();
@@ -43,7 +54,11 @@ void setup() {
   udp.begin(UDP_PORT);
 
   webUiRegisterCommonRoutes();
-  relayRegisterRoutes();
+  if (moduleType == "rgb") {
+    rgbRegisterRoutes();
+  } else {
+    relayRegisterRoutes();
+  }
   netRegisterConfigRoutes();
 
   if (role == "master") {
@@ -67,4 +82,5 @@ void loop() {
   netTick();
   discoveryLoop();
   otaLoop();
+  if (moduleType == "rgb") rgbLoop();
 }

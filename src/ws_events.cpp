@@ -11,7 +11,7 @@ void wsOnEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventTyp
   }
 }
 
-void broadcastRelayState(const String& moduleIp, bool power) {
+void broadcastPowerState(const String& moduleIp, bool power) {
   if (ws.count() == 0) return;
 
   JsonDocument doc;
@@ -25,7 +25,7 @@ void broadcastRelayState(const String& moduleIp, bool power) {
 }
 
 void broadcastAllStates() {
-  broadcastRelayState(WiFi.localIP().toString(), relayState);
+  broadcastPowerState(WiFi.localIP().toString(), moduleType == "rgb" ? rgbPower : relayState);
   // Other modules broadcast their own state on change; the master doesn't
   // poll them just to fill a newly-connected client in.
 }

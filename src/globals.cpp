@@ -10,6 +10,12 @@ IPAddress broadcastIP;
 const int RELAY_PIN = 1;
 bool relayState = false;
 
+bool rgbPower = true;
+uint8_t rgbMode = 1;  // RGB_MODE_STATIC
+uint8_t rgbBrightness = 120;
+uint8_t rgbSpeed = 128;
+uint32_t rgbColorHex = 0xFFFFFF;
+
 String deviceName = "Module";
 String role = "slave";
 String moduleType = "relay";
