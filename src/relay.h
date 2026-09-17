@@ -1,5 +1,10 @@
 #pragma once
 
+// Reads the "invert" preference (set via /config) so relayForceOff() and
+// relayApplyState() drive the correct physical level. Call after prefs is
+// loaded but before relayForceOff().
+void relayLoadConfig();
+
 // Configures the pin and forces the relay off. Call first, before prefs is
 // loaded, so the relay can't end up energized by an undefined pin state.
 void relayForceOff();

@@ -9,9 +9,10 @@
 
 void setup() {
   healthInitWatchdog();
-  relayForceOff();
 
   prefs.begin("smartmod", false);
+  relayLoadConfig();
+  relayForceOff();
 
   String savedSsid = prefs.getString("ssid", "");
   String savedPass = prefs.getString("pass", "");

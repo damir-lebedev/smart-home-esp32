@@ -43,6 +43,10 @@ static String renderConfigPage() {
     <label><input type="radio" name="role" value="master" {{checkedMaster}}> Главный модуль (master)</label>
   </div>
 
+  <div class="radio-group">
+    <label><input type="checkbox" name="invert" value="1" {{checkedInvert}}> Реле инвертировано (другая ревизия платы — включается высоким уровнем, а не низким)</label>
+  </div>
+
   <label>Ключ OTA (общий для всей сети, необязательно)</label>
   <input type="text" name="otakey" placeholder="оставьте пустым, чтобы не менять" value="{{keyfield}}">
   <p class="hint">Один и тот же ключ нужно задать на всех модулях, иначе мастер не сможет их обновить.{{keyhint}}</p>
@@ -59,6 +63,7 @@ static String renderConfigPage() {
   page.replace("{{name}}", deviceName);
   page.replace("{{checkedSlave}}", checkedSlave);
   page.replace("{{checkedMaster}}", checkedMaster);
+  page.replace("{{checkedInvert}}", prefs.getBool("invert", false) ? "checked" : "");
   page.replace("{{keyfield}}", "");
   return page;
 }
@@ -77,14 +82,14 @@ static void handleConfigForm(AsyncWebServerRequest* r, const String& action) {
       ? "<label>Текущий ключ OTA (для подтверждения)</label><input type=\"text\" name=\"key\" required>"
       : ""
   );
-  r->send(200, "text/html", page);
+  r->send(200, "text/html; charset=utf-8", page);
 }
 
 static unsigned long restartAtMs = 0;
 
 static void handleConfigSave(AsyncWebServerRequest* r) {
   if (!adminKeyOk(r)) {
-    r->send(401, "text/plain", "Неверный ключ OTA");
+    r->send(401, "text/plain; charset=utf-8", "Неверный ключ OTA");
     return;
   }
 
@@ -94,9 +99,10 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
   if (r->hasParam("name", true)) name = r->getParam("name", true)->value();
   if (r->hasParam("role", true)) roleVal = r->getParam("role", true)->value();
   if (r->hasParam("otakey", true)) otakey = r->getParam("otakey", true)->value();
+  bool invert = r->hasParam("invert", true);
 
   if (ssid == "") {
-    r->send(400, "text/plain", "SSID обязателен");
+    r->send(400, "text/plain; charset=utf-8", "SSID обязателен");
     return;
   }
 
@@ -110,8 +116,9 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
   prefs.putString("name", name.length() > 0 ? name : "Module");
   prefs.putString("role", roleVal == "master" ? "master" : "slave");
   prefs.putString("otakey", otakey);
+  prefs.putBool("invert", invert);
 
-  r->send(200, "text/plain", "Сохранено. Перезагрузка...");
+  r->send(200, "text/plain; charset=utf-8", "Сохранено. Перезагрузка...");
   // Restart from loop() shortly after, not here: this handler runs on the
   // AsyncTCP task, and blocking it with delay()+restart() can tear the
   // connection down before the response actually reaches the client.

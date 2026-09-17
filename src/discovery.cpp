@@ -4,9 +4,24 @@
 
 static unsigned long lastAnnounce = 0;
 
-static void announceSelf() {
+static String knownMasterIp;
+static String knownMasterName;
+static unsigned long knownMasterLastSeen = 0;
+
+bool discoveryGetMaster(String& ip, String& name) {
+  if (knownMasterIp.length() == 0) return false;
+  if (millis() - knownMasterLastSeen > MODULE_TIMEOUT) return false;
+  ip = knownMasterIp;
+  name = knownMasterName;
+  return true;
+}
+
+// Every module announces itself so the others can find it: a master needs
+// this to build its module list, and a slave needs it so it can show a link
+// back to whichever module is currently acting as master.
+static void announcePresence() {
   JsonDocument doc;
-  doc["cmd"] = "announce";
+  doc["cmd"] = (role == "master") ? "master_here" : "announce";
   doc["name"] = deviceName;
   doc["type"] = moduleType;
   doc["ip"] = WiFi.localIP().toString();
@@ -19,7 +34,7 @@ static void announceSelf() {
   udp.endPacket();
 }
 
-static void pollAnnouncements() {
+static void pollIncoming() {
   int packetSize = udp.parsePacket();
   if (packetSize) {
     char buf[256] = {0};
@@ -32,17 +47,21 @@ static void pollAnnouncements() {
       DeserializationError err = deserializeJson(doc, msg);
       if (!err) {
         String cmd = doc["cmd"] | "";
-        if (cmd == "announce") {
-          String name = doc["name"] | "Unknown";
-          String type = doc["type"] | "unknown";
-          String ip = doc["ip"] | "";
+        String ip = doc["ip"] | "";
+        String name = doc["name"] | "Unknown";
 
-          if (ip.length() > 6 && ip != WiFi.localIP().toString()) {
+        if (ip.length() > 6 && ip != WiFi.localIP().toString()) {
+          if (cmd == "announce" && role == "master") {
+            String type = doc["type"] | "unknown";
             ModuleInfo info;
             info.name = name;
             info.type = type;
             info.lastSeen = millis();
             discoveredModules[ip] = info;
+          } else if (cmd == "master_here") {
+            knownMasterIp = ip;
+            knownMasterName = name;
+            knownMasterLastSeen = millis();
           }
         }
       }
@@ -61,12 +80,9 @@ static void pollAnnouncements() {
 }
 
 void discoveryLoop() {
-  if (role == "slave") {
-    if (millis() - lastAnnounce >= ANNOUNCE_INTERVAL) {
-      lastAnnounce = millis();
-      announceSelf();
-    }
-  } else if (role == "master") {
-    pollAnnouncements();
+  if (millis() - lastAnnounce >= ANNOUNCE_INTERVAL) {
+    lastAnnounce = millis();
+    announcePresence();
   }
+  pollIncoming();
 }

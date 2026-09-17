@@ -63,17 +63,17 @@ static void registerFirmwareUploadRoute() {
     [](AsyncWebServerRequest* r) {
       if (otaUploadUnauthorized) {
         otaUploadUnauthorized = false;
-        r->send(401, "text/plain", "Unauthorized");
+        r->send(401, "text/plain; charset=utf-8", "Unauthorized");
         return;
       }
       if (otaUploadOpenFailed) {
         r->send(
-          500, "text/plain",
+          500, "text/plain; charset=utf-8",
           String("Could not open /firmware.bin for writing (LittleFS mounted: ") + (fsMounted ? "yes" : "no") + ")"
         );
         return;
       }
-      r->send(200, "text/plain", "Uploaded: " + String((unsigned)otaUploadBytesWritten) + " bytes");
+      r->send(200, "text/plain; charset=utf-8", "Uploaded: " + String((unsigned)otaUploadBytesWritten) + " bytes");
     },
     [](AsyncWebServerRequest* r, String filename, size_t index, uint8_t* data, size_t len, bool final) {
       if (index == 0) {
@@ -107,7 +107,7 @@ static void registerFirmwareUploadRoute() {
 static void registerFirmwareDebugRoute() {
   server.on("/fleet/debug", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!adminKeyOk(r)) {
-      r->send(401, "text/plain", "Unauthorized");
+      r->send(401, "text/plain; charset=utf-8", "Unauthorized");
       return;
     }
     String out;
@@ -121,18 +121,18 @@ static void registerFirmwareDebugRoute() {
       out += String("entry: ") + f.path() + " (" + (unsigned)f.size() + " bytes)\n";
       f = root.openNextFile();
     }
-    r->send(200, "text/plain", out);
+    r->send(200, "text/plain; charset=utf-8", out);
   });
 }
 
 static void registerFirmwareServeRoute() {
   server.on("/firmware.bin", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!adminKeyOk(r)) {
-      r->send(401, "text/plain", "Unauthorized");
+      r->send(401, "text/plain; charset=utf-8", "Unauthorized");
       return;
     }
     if (!LittleFS.exists(FIRMWARE_PATH)) {
-      r->send(404, "text/plain", "No firmware uploaded yet");
+      r->send(404, "text/plain; charset=utf-8", "No firmware uploaded yet");
       return;
     }
     r->send(LittleFS, FIRMWARE_PATH, "application/octet-stream");
@@ -279,21 +279,21 @@ static void startDeploy(bool includeSelf) {
 static void registerDeployRoutes() {
   server.on("/fleet/deploy", HTTP_POST, [](AsyncWebServerRequest* r) {
     if (!adminKeyOk(r)) {
-      r->send(401, "text/plain", "Unauthorized");
+      r->send(401, "text/plain; charset=utf-8", "Unauthorized");
       return;
     }
     if (!LittleFS.exists(FIRMWARE_PATH)) {
-      r->send(400, "text/plain", "No firmware uploaded");
+      r->send(400, "text/plain; charset=utf-8", "No firmware uploaded");
       return;
     }
     if (otaDeployActive) {
-      r->send(409, "text/plain", "Deploy already running");
+      r->send(409, "text/plain; charset=utf-8", "Deploy already running");
       return;
     }
     bool includeSelf = true;
     if (r->hasParam("includeSelf")) includeSelf = r->getParam("includeSelf")->value() != "0";
     startDeploy(includeSelf);
-    r->send(200, "text/plain", "Deploy started");
+    r->send(200, "text/plain; charset=utf-8", "Deploy started");
   });
 
   server.on("/fleet/deploy/status", HTTP_GET, [](AsyncWebServerRequest* r) {
@@ -322,15 +322,15 @@ void otaBegin() {
 
   server.on("/fleet/pull", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (!adminKeyOk(r)) {
-      r->send(401, "text/plain", "Unauthorized");
+      r->send(401, "text/plain; charset=utf-8", "Unauthorized");
       return;
     }
     if (!r->hasParam("src")) {
-      r->send(400, "text/plain", "Missing src");
+      r->send(400, "text/plain; charset=utf-8", "Missing src");
       return;
     }
     scheduleSelfUpdate(r->getParam("src")->value());
-    r->send(200, "text/plain", "Scheduled");
+    r->send(200, "text/plain; charset=utf-8", "Scheduled");
   });
 
   if (role == "master") {

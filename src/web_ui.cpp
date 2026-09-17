@@ -1,5 +1,6 @@
 #include "web_ui.h"
 #include "globals.h"
+#include "discovery.h"
 #include <ArduinoJson.h>
 
 static String getUiFragment() {
@@ -47,9 +48,22 @@ void webUiRegisterCommonRoutes() {
     fragment.replace("{{ip}}", ipStr);
     fragment.replace("{{safeid}}", safeId);
 
-    AsyncWebServerResponse* resp = r->beginResponse(200, "text/html", fragment);
+    AsyncWebServerResponse* resp = r->beginResponse(200, "text/html; charset=utf-8", fragment);
     resp->addHeader("Access-Control-Allow-Origin", "*");
     r->send(resp);
+  });
+
+  server.on("/master", HTTP_GET, [](AsyncWebServerRequest* r) {
+    JsonDocument doc;
+    doc.to<JsonObject>();  // always emit {} rather than null when no master is known
+    String ip, name;
+    if (discoveryGetMaster(ip, name)) {
+      doc["ip"] = ip;
+      doc["name"] = name;
+    }
+    String buf;
+    serializeJson(doc, buf);
+    r->send(200, "application/json; charset=utf-8", buf);
   });
 }
 
@@ -338,12 +352,87 @@ pollDeployStatus();
 </html>
 )rawliteral";
 
-    r->send(200, "text/html", html);
+    r->send(200, "text/html; charset=utf-8", html);
   });
 }
 
 void webUiRegisterSlaveRoute() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* r) {
-    r->send(200, "text/plain", "Это slave-модуль. Используйте /ui, /status, /on, /off, /toggle, /update");
+    String html = R"rawliteral(
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{name}} — SmartModule</title>
+<style>
+  :root{--bg:#f0f2f5;--card:#fff;--pri:#1a73e8;--on:#34a853;--off:#ea4335;--gray:#5f6368;}
+  body{font-family:system-ui,sans-serif;background:var(--bg);margin:0;padding:20px;color:#202124;display:flex;flex-direction:column;align-items:center;}
+  .module-card{background:var(--card);border-radius:16px;padding:28px;box-shadow:0 2px 10px rgba(0,0,0,0.08);text-align:center;max-width:360px;width:100%;margin-top:12vh;box-sizing:border-box;}
+  .module-card h3{margin:0 0 12px;font-size:1.6em;}
+  .status{font-size:1.3em;font-weight:600;margin:12px 0;}
+  .indicator{font-size:4.5em;margin:8px 0;min-height:1.2em;}
+  .buttons{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .btn{padding:10px 18px;font-size:15px;border:none;border-radius:8px;color:white;cursor:pointer;min-width:80px;}
+  .on{background:var(--on);}
+  .off{background:var(--off);}
+  .toggle{background:var(--pri);}
+  .master-link{margin-top:20px;text-align:center;}
+  .master-link a{color:var(--pri);text-decoration:none;font-weight:600;font-size:1.05em;}
+  .footer-link{margin-top:32px;font-size:13px;}
+  .footer-link a{color:var(--gray);}
+</style>
+</head>
+<body>
+<div class="module-card">
+  <h3>{{name}}</h3>
+  <div class="status" id="status">Загрузка...</div>
+  <div class="indicator" id="indicator">⚪</div>
+  <div class="buttons">
+    <button class="btn on" onclick="cmd('on')">ВКЛ</button>
+    <button class="btn off" onclick="cmd('off')">ВЫКЛ</button>
+    <button class="btn toggle" onclick="cmd('toggle')">ПЕРЕКЛ</button>
+  </div>
+</div>
+<div class="master-link" id="masterLink"></div>
+<div class="footer-link"><a href="/config">Настройки модуля</a></div>
+
+<script>
+function cmd(act) {
+  fetch('/' + act).then(refresh).catch(() => {});
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/status');
+    const d = await r.json();
+    const power = !!d.state?.power;
+    const st = document.getElementById('status');
+    const ind = document.getElementById('indicator');
+    st.textContent = power ? 'ВКЛЮЧЕНО' : 'ВЫКЛЮЧЕНО';
+    st.style.color = power ? 'var(--on)' : 'var(--off)';
+    ind.textContent = power ? '💡' : '⚪';
+  } catch (e) {}
+}
+
+async function loadMaster() {
+  try {
+    const r = await fetch('/master');
+    const d = await r.json();
+    const box = document.getElementById('masterLink');
+    box.innerHTML = d.ip ? `<a href="http://${d.ip}/">🏠 К мастеру (${d.name})</a>` : '';
+  } catch (e) {}
+}
+
+refresh();
+loadMaster();
+setInterval(refresh, 5000);
+setInterval(loadMaster, 10000);
+</script>
+</body>
+</html>
+)rawliteral";
+    html.replace("{{name}}", deviceName);
+    r->send(200, "text/html; charset=utf-8", html);
   });
 }
