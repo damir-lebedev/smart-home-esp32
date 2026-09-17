@@ -55,6 +55,9 @@ static String renderConfigPage() {
     <label><input type="checkbox" name="invert" value="1" {{checkedInvert}}> Реле инвертировано (другая ревизия платы — включается высоким уровнем, а не низким; не относится к RGB-модулю)</label>
   </div>
 
+  <label>Пин данных RGB-ленты (GPIO, только для RGB-модуля)</label>
+  <input type="number" name="ledpin" min="0" max="21" value="{{ledpin}}">
+
   <label>Ключ OTA (общий для всей сети, необязательно)</label>
   <input type="text" name="otakey" placeholder="оставьте пустым, чтобы не менять" value="{{keyfield}}">
   <p class="hint">Один и тот же ключ нужно задать на всех модулях, иначе мастер не сможет их обновить.{{keyhint}}</p>
@@ -74,6 +77,7 @@ static String renderConfigPage() {
   page.replace("{{checkedRelay}}", checkedRelay);
   page.replace("{{checkedRgb}}", checkedRgb);
   page.replace("{{checkedInvert}}", prefs.getBool("invert", false) ? "checked" : "");
+  page.replace("{{ledpin}}", String(prefs.getUChar("ledpin", 0)));
   page.replace("{{keyfield}}", "");
   return page;
 }
@@ -103,13 +107,14 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
     return;
   }
 
-  String ssid, pass, name, roleVal, typeVal, otakey;
+  String ssid, pass, name, roleVal, typeVal, otakey, ledpinStr;
   if (r->hasParam("ssid", true)) ssid = r->getParam("ssid", true)->value();
   if (r->hasParam("pass", true)) pass = r->getParam("pass", true)->value();
   if (r->hasParam("name", true)) name = r->getParam("name", true)->value();
   if (r->hasParam("role", true)) roleVal = r->getParam("role", true)->value();
   if (r->hasParam("type", true)) typeVal = r->getParam("type", true)->value();
   if (r->hasParam("otakey", true)) otakey = r->getParam("otakey", true)->value();
+  if (r->hasParam("ledpin", true)) ledpinStr = r->getParam("ledpin", true)->value();
   bool invert = r->hasParam("invert", true);
 
   if (ssid == "") {
@@ -121,6 +126,7 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
   // module doesn't force retyping the WiFi password every time.
   if (pass.length() == 0) pass = prefs.getString("pass", "");
   if (otakey.length() == 0) otakey = otaKey();
+  uint8_t ledpin = ledpinStr.length() ? (uint8_t)ledpinStr.toInt() : prefs.getUChar("ledpin", 0);
 
   prefs.putString("ssid", ssid);
   prefs.putString("pass", pass);
@@ -129,6 +135,7 @@ static void handleConfigSave(AsyncWebServerRequest* r) {
   prefs.putString("type", typeVal == "rgb" ? "rgb" : "relay");
   prefs.putString("otakey", otakey);
   prefs.putBool("invert", invert);
+  prefs.putUChar("ledpin", ledpin);
 
   r->send(200, "text/plain; charset=utf-8", "Сохранено. Перезагрузка...");
   // Restart from loop() shortly after, not here: this handler runs on the

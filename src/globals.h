@@ -12,7 +12,7 @@
 // /status on every module, so you can always tell which firmware a device is
 // actually running (and the network-wide OTA rollout uses it to confirm a
 // device has actually rebooted into the new build).
-#define FIRMWARE_VERSION "2026.09.17-13"
+#define FIRMWARE_VERSION "2026.09.17-16"
 
 extern AsyncWebServer server;
 extern AsyncWebSocket ws;
@@ -40,7 +40,9 @@ struct ModuleInfo {
   unsigned long lastSeen;
 };
 
-// Master-only: IP -> discovered slave info.
+// IP -> info for every other module heard on the network. Every module
+// (regardless of its own role) builds this from UDP announcements, so any
+// device's dashboard can show and control the whole fleet, not just master's.
 extern std::map<String, ModuleInfo> discoveredModules;
 
 extern const int UDP_PORT;

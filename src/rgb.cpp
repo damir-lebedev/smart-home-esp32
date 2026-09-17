@@ -5,8 +5,17 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 
-static const uint8_t RGB_LED_PIN = 0;
+static const uint8_t RGB_LED_PIN_DEFAULT = 0;
 static const int RGB_NUM_LEDS = 570;
+
+// Hard cap at 85% of full brightness (255) to keep current draw down — strips
+// pushed to 100% cook their own diodes, and a dead WS2812 takes out every LED
+// after it on the strip until it's desoldered and replaced.
+static const uint8_t RGB_MAX_BRIGHTNESS = 216;
+
+static uint8_t clampBrightness(uint16_t b) {
+  return (uint8_t)(b > RGB_MAX_BRIGHTNESS ? RGB_MAX_BRIGHTNESS : b);
+}
 
 static CRGB leds[RGB_NUM_LEDS];
 
@@ -19,15 +28,37 @@ static CRGB colorFromHex(uint32_t c) {
   return CRGB((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF);
 }
 
+// FastLED needs the data pin as a compile-time template argument, so a
+// runtime-configured pin (see "ledpin" in prefs, set via /config) has to be
+// dispatched through a switch rather than passed as a plain variable. Boards
+// wired up differently (a hardware revision using another GPIO for the strip)
+// pick their pin here instead of needing a firmware fork.
+static void addLedsOnPin(uint8_t pin) {
+  switch (pin) {
+    case 0: FastLED.addLeds<WS2812, 0, GRB>(leds, RGB_NUM_LEDS); break;
+    case 1: FastLED.addLeds<WS2812, 1, GRB>(leds, RGB_NUM_LEDS); break;
+    case 2: FastLED.addLeds<WS2812, 2, GRB>(leds, RGB_NUM_LEDS); break;
+    case 3: FastLED.addLeds<WS2812, 3, GRB>(leds, RGB_NUM_LEDS); break;
+    case 4: FastLED.addLeds<WS2812, 4, GRB>(leds, RGB_NUM_LEDS); break;
+    case 5: FastLED.addLeds<WS2812, 5, GRB>(leds, RGB_NUM_LEDS); break;
+    case 6: FastLED.addLeds<WS2812, 6, GRB>(leds, RGB_NUM_LEDS); break;
+    case 7: FastLED.addLeds<WS2812, 7, GRB>(leds, RGB_NUM_LEDS); break;
+    case 8: FastLED.addLeds<WS2812, 8, GRB>(leds, RGB_NUM_LEDS); break;
+    case 9: FastLED.addLeds<WS2812, 9, GRB>(leds, RGB_NUM_LEDS); break;
+    case 10: FastLED.addLeds<WS2812, 10, GRB>(leds, RGB_NUM_LEDS); break;
+    default: FastLED.addLeds<WS2812, RGB_LED_PIN_DEFAULT, GRB>(leds, RGB_NUM_LEDS); break;
+  }
+}
+
 void rgbInit() {
-  FastLED.addLeds<WS2812, RGB_LED_PIN, GRB>(leds, RGB_NUM_LEDS);
+  addLedsOnPin(prefs.getUChar("ledpin", RGB_LED_PIN_DEFAULT));
   fill_solid(leds, RGB_NUM_LEDS, CRGB::Black);
   FastLED.show();
 }
 
 void rgbLoadConfig() {
   rgbPower = prefs.getBool("power", true);
-  rgbBrightness = prefs.getUChar("bright", 120);
+  rgbBrightness = clampBrightness(prefs.getUChar("bright", 120));
   rgbMode = prefs.getUChar("mode", RGB_MODE_STATIC);
   rgbSpeed = prefs.getUChar("speed", 128);
   rgbColorHex = prefs.getUInt("color", 0xFFFFFF);
@@ -50,6 +81,11 @@ void rgbRegisterRoutes() {
     r->send(200, "text/plain; charset=utf-8", "OFF");
   });
 
+  server.on("/toggle", HTTP_GET, [](AsyncWebServerRequest* r) {
+    rgbSet(!rgbPower);
+    r->send(200, "text/plain; charset=utf-8", rgbPower ? "ON" : "OFF");
+  });
+
   server.on("/mode", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (r->hasParam("set")) {
       uint8_t m = r->getParam("set")->value().toInt();
@@ -69,7 +105,7 @@ void rgbRegisterRoutes() {
 
   server.on("/brightness", HTTP_GET, [](AsyncWebServerRequest* r) {
     if (r->hasParam("val")) {
-      rgbBrightness = r->getParam("val")->value().toInt();
+      rgbBrightness = clampBrightness(r->getParam("val")->value().toInt());
       prefs.putUChar("bright", rgbBrightness);
     }
     r->send(200, "text/plain; charset=utf-8", "OK");

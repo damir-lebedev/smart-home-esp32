@@ -26,6 +26,7 @@ void broadcastPowerState(const String& moduleIp, bool power) {
 
 void broadcastAllStates() {
   broadcastPowerState(WiFi.localIP().toString(), moduleType == "rgb" ? rgbPower : relayState);
-  // Other modules broadcast their own state on change; the master doesn't
-  // poll them just to fill a newly-connected client in.
+  // Each module's WebSocket only ever knows its own state — other modules'
+  // tiles on the dashboard get filled in by the regular /status poll
+  // (refreshModules() in web_ui.cpp), not by this device reaching out to them.
 }

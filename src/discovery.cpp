@@ -16,12 +16,13 @@ bool discoveryGetMaster(String& ip, String& name) {
   return true;
 }
 
-// Every module announces itself so the others can find it: a master needs
-// this to build its module list, and a slave needs it so it can show a link
-// back to whichever module is currently acting as master.
+// Every module announces itself so the others can find it: every module (not
+// just the master) builds its own full fleet list this way, and separately
+// remembers whichever module is currently acting as master.
 static void announcePresence() {
   JsonDocument doc;
-  doc["cmd"] = (role == "master") ? "master_here" : "announce";
+  doc["cmd"] = "announce";
+  doc["role"] = role;
   doc["name"] = deviceName;
   doc["type"] = moduleType;
   doc["ip"] = WiFi.localIP().toString();
@@ -49,16 +50,17 @@ static void pollIncoming() {
         String cmd = doc["cmd"] | "";
         String ip = doc["ip"] | "";
         String name = doc["name"] | "Unknown";
+        String peerRole = doc["role"] | "slave";
 
-        if (ip.length() > 6 && ip != WiFi.localIP().toString()) {
-          if (cmd == "announce" && role == "master") {
-            String type = doc["type"] | "unknown";
-            ModuleInfo info;
-            info.name = name;
-            info.type = type;
-            info.lastSeen = millis();
-            discoveredModules[ip] = info;
-          } else if (cmd == "master_here") {
+        if (ip.length() > 6 && ip != WiFi.localIP().toString() && cmd == "announce") {
+          String type = doc["type"] | "unknown";
+          ModuleInfo info;
+          info.name = name;
+          info.type = type;
+          info.lastSeen = millis();
+          discoveredModules[ip] = info;
+
+          if (peerRole == "master") {
             knownMasterIp = ip;
             knownMasterName = name;
             knownMasterLastSeen = millis();

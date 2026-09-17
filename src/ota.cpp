@@ -208,6 +208,14 @@ static void triggerPull(const String& targetIp) {
   String firmwareUrl = "http://" + WiFi.localIP().toString() + "/firmware.bin";
   if (key.length()) firmwareUrl += "?key=" + urlEncode(key);
 
+  // Known unreliable: a device downloading its own /firmware.bin from itself
+  // means the same device is simultaneously the HTTP client (blocked inside
+  // httpUpdate.update()) and the server that has to answer that exact
+  // request. In practice this self-target has been observed to just sit on
+  // the old firmware indefinitely without erroring — masterDeployTick() will
+  // report it as TIMEOUT. If it happens, re-trigger the pull directly
+  // (GET /fleet/pull?src=... on the device itself) or, more reliably, flash
+  // it from a *different* module acting as master instead of from itself.
   if (targetIp == WiFi.localIP().toString()) {
     scheduleSelfUpdate(firmwareUrl);
     return;

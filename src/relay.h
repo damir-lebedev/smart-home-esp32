@@ -5,8 +5,10 @@
 // loaded but before relayForceOff().
 void relayLoadConfig();
 
-// Configures the pin and forces the relay off. Call first, before prefs is
-// loaded, so the relay can't end up energized by an undefined pin state.
+// Configures the pin and forces the relay off. Must be called after
+// relayLoadConfig() (not before) — it needs "invert" already loaded to know
+// which physical level is actually off, otherwise an inverted board would
+// energize the relay instead of de-energizing it.
 void relayForceOff();
 
 // Drives the pin to match the currently loaded relayState. Call once

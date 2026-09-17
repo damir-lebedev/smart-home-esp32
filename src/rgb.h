@@ -10,8 +10,10 @@ enum RgbMode {
   RGB_MODE_COUNT
 };
 
-// Attaches the LED strip on RGB_LED_PIN. Call once in setup(), before prefs
-// are loaded, so the strip is in a known (driven, blanked) state as early as
+// Attaches the LED strip on the data pin from prefs ("ledpin", set via
+// /config — different hardware revisions wire the strip to different GPIOs,
+// same as relay's "invert"). Call once in setup(), before prefs are loaded
+// elsewhere, so the strip is in a known (driven, blanked) state as early as
 // relayForceOff() puts the relay pin in one on a relay module.
 void rgbInit();
 
@@ -20,11 +22,11 @@ void rgbLoadConfig();
 
 void rgbSet(bool on);
 
-// Registers /on, /off, /mode, /color, /brightness, /speed. Call only when
-// this module's moduleType is "rgb".
+// Registers /on, /off, /toggle, /mode, /color, /brightness, /speed. Call
+// only when this module's moduleType is "rgb".
 void rgbRegisterRoutes();
 
 // Advances whichever animation is currently selected and pushes it to the
 // strip; rate-limited internally by rgbSpeed. Call once per loop() iteration
-// unconditionally - it no-ops immediately when the strip is off.
+// unconditionally — it blanks the strip and returns immediately when off.
 void rgbLoop();
